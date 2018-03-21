@@ -136,13 +136,10 @@ public:
     vector<double> store_x_values;
     vector<double> store_y_values;
     
-    //Testing CCEA
-    bool for_testing = false;
-    double best_value_so_far;
-    
-    //NSGA-II
-    vector<double> dominating_over;
-    double dominating_me;
+    //Objective values
+    double collision_with_agents;
+    double collision_with_obstacles;
+    double path_value;
 };
 
 Net::Net(vector<unsigned> topology){
@@ -1387,6 +1384,14 @@ void test_all_sensors(){
 
 void simulation( vector<Rover>* teamRover, POI* individualPOI,double scaling_number){
     
+    for (int rover_number =0; rover_number < teamRover->size(); rover_number++) {
+        teamRover->at(rover_number).network_for_agent.at(0).closest_dist_to_poi.clear();
+        for (int poi_number =0; poi_number<individualPOI->value_poi_vec.size(); poi_number++) {
+            teamRover->at(rover_number).network_for_agent.at(0).closest_dist_to_poi.push_back(99999999.9999);
+        }
+        
+    }
+    
     //setting all rovers to inital state
     for (int temp_rover_number =0 ; temp_rover_number<teamRover->size(); temp_rover_number++) {
         teamRover->at(temp_rover_number).x_position = teamRover->at(temp_rover_number).x_position_vec.at(0);
@@ -1424,16 +1429,125 @@ void simulation( vector<Rover>* teamRover, POI* individualPOI,double scaling_num
             teamRover->at(rover_number).network_for_agent.at(0).store_x_values.push_back(teamRover->at(rover_number).x_position);
             teamRover->at(rover_number).network_for_agent.at(0).store_y_values.push_back(teamRover->at(rover_number).y_position);
             
+            for (int cal_dis =0; cal_dis<individualPOI->value_poi_vec.size(); cal_dis++) {
+                double x_distance_cal =((teamRover->at(rover_number).x_position) -(individualPOI->x_position_poi_vec.at(cal_dis)));
+                double y_distance_cal = ((teamRover->at(rover_number).y_position) -(individualPOI->y_position_poi_vec.at(cal_dis)));
+                double distance = sqrt((x_distance_cal*x_distance_cal)+(y_distance_cal*y_distance_cal));
+                if (teamRover->at(rover_number).network_for_agent.at(0).closest_dist_to_poi.at(cal_dis) > distance) {
+                    teamRover->at(rover_number).network_for_agent.at(0).closest_dist_to_poi.at(cal_dis) = distance ;
+                }
+            }
+            
         }
     }
+}
+
+double cal_distance(double x1, double y1, double x2, double y2){
+    return sqrt(pow((x1 - x2), 2)+pow((y1 - y2), 2));
+}
+
+bool check_safe_distance(double safe_distance, double cal_distance_between){
+    if (cal_distance_between <= (safe_distance+0.0005)) {
+        return true;
+    }
+    return false;
+}
+
+bool check_if_between(double distance_between_rovers, double cal_distance_between, double safe_distance){
+    if (((distance_between_rovers+0.0005) <= cal_distance_between) && (cal_distance_between > safe_distance)) {
+        return true;
+    }
+    return false;
 }
 
 void cal(vector<Rover>* teamRover, vector<vector<double>>* p_location_obstacle, double distance_between_rovers,double radius_of_obstacles, double safe_distance){
     
     //Check distance between each agent
+    for (int rover_number = 0 ; rover_number < teamRover->size(); rover_number++) {
+        teamRover->at(rover_number).network_for_agent.at(0).collision_with_agents = 0;
+        for (int other_rover = 0 ; other_rover < teamRover->size(); other_rover++) {
+            if (rover_number != other_rover) {
+                for (int index = 0 ; index < teamRover->at(rover_number).network_for_agent.at(0).store_x_values.size(); index++) {
+                    double cal_distance_between = cal_distance(teamRover->at(rover_number).network_for_agent.at(0).store_x_values.at(index), teamRover->at(rover_number).network_for_agent.at(0).store_y_values.at(index), teamRover->at(other_rover).network_for_agent.at(0).store_x_values.at(index), teamRover->at(other_rover).network_for_agent.at(0).store_y_values.at(index));
+                    
+                    /*
+                     First check if they are colliding or inside safe distance, punish them very high;
+                     If they are in formation, give them good score;
+                     If not check if they are in formation, if not punish them medium;
+                     */
+                    if (check_safe_distance(safe_distance, cal_distance_between)) {
+                        teamRover->at(rover_number).network_for_agent.at(0).collision_with_agents += 100000;
+                    }else if (check_if_between(distance_between_rovers, cal_distance_between,safe_distance)){
+                        teamRover->at(rover_number).network_for_agent.at(0).collision_with_agents += -1000;
+                    }else{
+                        teamRover->at(rover_number).network_for_agent.at(0).collision_with_agents += 1000;
+                    }
+                }
+            }
+        }
+    }
     
+    //check collision with obstacles
+    for (int rover_number = 0 ; rover_number < teamRover->size(); rover_number++) {
+        teamRover->at(rover_number).network_for_agent.at(0).collision_with_obstacles = 0;
+        for (int index = 0 ; index < teamRover->at(rover_number).network_for_agent.at(0).store_x_values.size(); index++) {
+            for (int index_1 = 0 ; index_1 < p_location_obstacle->size(); index_1++) {
+                double dist = cal_distance(teamRover->at(rover_number).network_for_agent.at(0).store_x_values.at(index), teamRover->at(rover_number).network_for_agent.at(0).store_y_values.at(index), p_location_obstacle->at(index_1).at(0), p_location_obstacle->at(index_1).at(1));
+                
+                if (dist < radius_of_obstacles) {
+                    teamRover->at(rover_number).network_for_agent.at(0).collision_with_obstacles += -1000;
+                }else{
+                    teamRover->at(rover_number).network_for_agent.at(0).collision_with_obstacles += 100000;
+                }
+            }
+        }
+    }
+    
+    //Check for path
+    for (int rover_number = 0 ; rover_number < teamRover->size(); rover_number++) {
+        teamRover->at(rover_number).network_for_agent.at(0).path_value = 0;
+        for (int index = 0 ; index < teamRover->at(rover_number).network_for_agent.at(0).closest_dist_to_poi.size(); index++) {
+            teamRover->at(rover_number).network_for_agent.at(0).path_value += (100/teamRover->at(rover_number).network_for_agent.at(0).closest_dist_to_poi.at(index));
+        }
+    }
+}
+
+void EA_working(vector<Rover>* teamRover, int number_of_rovers){
+    for (int half = 0 ; half < (number_of_rovers/2); half++) {
+        int num_1 = rand()%teamRover->size();
+        int num_2 = rand()%teamRover->size();
+        while (num_1 == num_2) {
+            num_1 = rand()%teamRover->size();
+            num_2 = rand()%teamRover->size();
+        }
+        
+        if (teamRover->at(num_1).network_for_agent.at(0).collision_with_agents > teamRover->at(num_2).network_for_agent.at(0).collision_with_agents) {
+            //Kill num_1
+            teamRover->erase(teamRover->begin()+(num_1-1));
+        }else{
+            //Kill num_2
+            teamRover->erase(teamRover->begin()+(num_1-1));
+        }
+    }
+//    cout<<teamRover->size()<<endl;
+    for (int index = teamRover->size(); index < number_of_rovers; index++) {
+        int num = rand()%teamRover->size();
+        teamRover->push_back(teamRover->at(num));
+        teamRover->at(num).network_for_agent.at(0).mutate();
+    }
+    
+//    cout<<teamRover->size()<<endl;
     
 }
+
+void clean(vector<Rover>* teamRover){
+    for (int rover_number = 0 ; rover_number < teamRover->size(); rover_number++) {
+        teamRover->at(rover_number).network_for_agent.at(0).store_x_values.clear();
+        teamRover->at(rover_number).network_for_agent.at(0).store_y_values.clear();
+        teamRover->at(rover_number).network_for_agent.at(0).closest_dist_to_poi.clear();
+    }
+}
+
 
 /***************************
  Main
@@ -1451,8 +1565,13 @@ int main(int argc, const char * argv[]) {
     
     if (run_simulation) {
         
+        //File deleting
+        remove("Location");
+        remove("values");
+        remove("coordinate");
+        
         //First set up environment
-        int number_of_rovers = 4;
+        int number_of_rovers = 100;
         int number_of_obstacles = 5;
         double radius_of_obstacles = 2;
         double distance_between_rovers = 1;
@@ -1517,8 +1636,16 @@ int main(int argc, const char * argv[]) {
         assert(p_rover->size() == number_of_rovers);
         assert(location_obstacle.size() == number_of_obstacles);
         
+        
+        FILE* p_location;
+        p_location = fopen("Location", "a");
+        for (int poi = 0 ; poi < location_obstacle.size(); poi++) {
+            fprintf(p_location, "%f \t %f \n", location_obstacle.at(poi).at(0),location_obstacle.at(poi).at(1));
+        }
+        fclose(p_location);
+        
         //Generations
-        for(int generation =0 ; generation < 1 ;generation++){
+        for(int generation =0 ; generation < 10 ;generation++){
             int case_number = 1;
             switch (case_number) {
                 case 1:
@@ -1528,21 +1655,59 @@ int main(int argc, const char * argv[]) {
                 case 2:
                     break;
             }
+            cal(p_rover,p_location_obstacle,distance_between_rovers,radius_of_obstacles,safe_distance);
             
-            bool print_t = true;
-            if (print_t) {
-                FILE* p_file;
-                p_file = fopen("coordinate", "a");
-                for (int rover_number = 0 ; rover_number < p_rover->size(); rover_number++) {
-                    for (int x = 0; x < p_rover->at(rover_number).network_for_agent.at(0).store_x_values.size(); x++) {
-                        fprintf(p_file, "%f \t %f \n",p_rover->at(rover_number).network_for_agent.at(0).store_x_values.at(x),p_rover->at(rover_number).network_for_agent.at(0).store_y_values.at(x));
+            if (generation == 0) {
+                bool print_t = true;
+                if (print_t) {
+                    FILE* p_file;
+                    p_file = fopen("coordinate_0", "a");
+                    for (int rover_number = 0 ; rover_number < p_rover->size(); rover_number++) {
+                        for (int x = 0; x < p_rover->at(rover_number).network_for_agent.at(0).store_x_values.size(); x++) {
+                            fprintf(p_file, "%f \t %f \n",p_rover->at(rover_number).network_for_agent.at(0).store_x_values.at(x),p_rover->at(rover_number).network_for_agent.at(0).store_y_values.at(x));
+                        }
+                        fprintf(p_file, "\n");
                     }
-                    fprintf(p_file, "\n");
+                    fclose(p_file);
                 }
-                fclose(p_file);
+                
+                bool print_v = true;
+                if (print_v) {
+                    FILE* p_f;
+                    p_f = fopen("values_0", "a");
+                    for (int rover_number = 0 ; rover_number< p_rover->size(); rover_number++) {
+                        fprintf(p_f, "%f \t %f \t %f \n", p_rover->at(rover_number).network_for_agent.at(0).collision_with_agents, p_rover->at(rover_number).network_for_agent.at(0).collision_with_obstacles,p_rover->at(rover_number).network_for_agent.at(0).path_value);
+                    }
+                    fclose(p_f);
+                }
             }
             
-            cal(p_rover,p_location_obstacle,distance_between_rovers,radius_of_obstacles,safe_distance);
+            if (generation == 9) {
+                bool print_t = true;
+                if (print_t) {
+                    FILE* p_file;
+                    p_file = fopen("coordinate_9", "a");
+                    for (int rover_number = 0 ; rover_number < p_rover->size(); rover_number++) {
+                        for (int x = 0; x < p_rover->at(rover_number).network_for_agent.at(0).store_x_values.size(); x++) {
+                            fprintf(p_file, "%f \t %f \n",p_rover->at(rover_number).network_for_agent.at(0).store_x_values.at(x),p_rover->at(rover_number).network_for_agent.at(0).store_y_values.at(x));
+                        }
+                        fprintf(p_file, "\n");
+                    }
+                    fclose(p_file);
+                }
+                
+                bool print_v = true;
+                if (print_v) {
+                    FILE* p_f;
+                    p_f = fopen("values_9", "a");
+                    for (int rover_number = 0 ; rover_number< p_rover->size(); rover_number++) {
+                        fprintf(p_f, "%f \t %f \t %f \n", p_rover->at(rover_number).network_for_agent.at(0).collision_with_agents, p_rover->at(rover_number).network_for_agent.at(0).collision_with_obstacles,p_rover->at(rover_number).network_for_agent.at(0).path_value);
+                    }
+                    fclose(p_f);
+                }
+            }
+            EA_working(p_rover,number_of_rovers);
+            clean(p_rover);
         }
         
         
