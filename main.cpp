@@ -1600,6 +1600,7 @@ void nsgaii(vector<Rover>* teamRover, int number_of_rovers){
     //Set all rovers to false
     for (int rover_number =0 ; rover_number< teamRover->size(); rover_number++) {
         teamRover->at(rover_number).network_for_agent.at(0).already_has_front = false;
+        teamRover->at(rover_number).network_for_agent.at(0).safe = false;
     }
     
     //First sort with domination. We need all low domination for simulation
@@ -1693,22 +1694,23 @@ void nsgaii(vector<Rover>* teamRover, int number_of_rovers){
     }
     assert(safe_rover.size() == unsafe.size());
     
+    cout<<"Rover size before::"<<teamRover->size()<<endl;
     
-    
-    for (int rover_number = 0; rover_number < teamRover->size() ;rover_number++ ) {
-        if (teamRover->at(rover_number).network_for_agent.at(0).safe == false) {
-            //remove this agent
-            teamRover->erase(teamRover->begin()+(rover_number));
-            rover_number = -1 ;
+    for (int rover_number = 0 ; rover_number < teamRover->size(); ) {
+        if (teamRover->at(rover_number).network_for_agent.at(0).safe) {
+            rover_number++;
+        }else{
+            teamRover->erase(teamRover->begin()+rover_number);
+            rover_number = 0;
         }
     }
     
+    cout<<"Rover size outside::"<<teamRover->size()<<endl;
+    assert(teamRover->size() == (number_of_rovers/2));
     
-//    for (int rover_number = 0 ; teamRover->size(); rover_number++) {
-//        assert(teamRover->at(rover_number).network_for_agent.at(0).safe == true);
-//    }
-    
-    //assert(teamRover->size() == (number_of_rovers/2));
+    for (int rover_number = 0; rover_number < teamRover->size(); rover_number++) {
+        assert(teamRover->at(rover_number).network_for_agent.at(0).safe == true);
+    }
     
     for (int index = teamRover->size(); index < number_of_rovers; index++) {
         int num = rand()%teamRover->size();
@@ -1871,6 +1873,7 @@ int main(int argc, const char * argv[]) {
         //Generations
         for(int generation =0 ; generation < 100 ;generation++){
             cout<<generation<<"Generation"<<endl;
+            cout<<"Size"<<teamRover.size()<<endl;
             int case_number = 1;
             switch (case_number) {
                 case 1:
@@ -1881,6 +1884,9 @@ int main(int argc, const char * argv[]) {
                     break;
             }
             cal(p_rover,p_location_obstacle,distance_between_rovers,radius_of_obstacles,safe_distance);
+            //EA_working(p_rover,number_of_rovers);
+            nsgaii(p_rover, number_of_rovers);
+            clean(p_rover);
             
             if (generation == 0) {
                 bool print_t = true;
@@ -1931,9 +1937,7 @@ int main(int argc, const char * argv[]) {
                     fclose(p_f);
                 }
             }
-            //EA_working(p_rover,number_of_rovers);
-            nsgaii(p_rover, number_of_rovers);
-            clean(p_rover);
+            
         }
         
         
