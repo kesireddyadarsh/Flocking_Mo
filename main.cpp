@@ -1670,7 +1670,7 @@ void nsgaii(vector<Rover>* teamRover, int number_of_rovers){
         }
         
     }
-    assert(safe_rover.size() == number_of_rovers/2);
+    assert(safe_rover.size() == (number_of_rovers/2));
     
     //Now remove agents which are not useful
     int count = 0;
@@ -1682,20 +1682,33 @@ void nsgaii(vector<Rover>* teamRover, int number_of_rovers){
             }
         }
     }
-    cout<<count<<endl;
-    cout<<"rover"<<endl;
     
-    for (int rover_number = 0 ; rover_number < teamRover->size();rover_number++ ) {
-        cout<<rover_number<<endl;
+    assert(count == safe_rover.size());
+    
+    vector<int> unsafe;
+    for (int index = 0; index < number_of_rovers; index++) {
+        if (!(find(safe_rover.begin(), safe_rover.end(), index) != safe_rover.end())) {
+            unsafe.push_back(index);
+        }
+    }
+    assert(safe_rover.size() == unsafe.size());
+    
+    
+    
+    for (int rover_number = 0; rover_number < teamRover->size() ;rover_number++ ) {
         if (teamRover->at(rover_number).network_for_agent.at(0).safe == false) {
             //remove this agent
-            teamRover->erase(teamRover->begin()+rover_number);
+            teamRover->erase(teamRover->begin()+(rover_number));
             rover_number = -1 ;
         }
     }
     
-    cout<< teamRover->size()<<endl;
-    assert(teamRover->size() == (number_of_rovers/2));
+    
+//    for (int rover_number = 0 ; teamRover->size(); rover_number++) {
+//        assert(teamRover->at(rover_number).network_for_agent.at(0).safe == true);
+//    }
+    
+    //assert(teamRover->size() == (number_of_rovers/2));
     
     for (int index = teamRover->size(); index < number_of_rovers; index++) {
         int num = rand()%teamRover->size();
@@ -1705,6 +1718,8 @@ void nsgaii(vector<Rover>* teamRover, int number_of_rovers){
     
     assert(teamRover->size() == number_of_rovers);
     
+    finial_front.clear();
+    safe_rover.clear();
     
     
 }
@@ -1742,6 +1757,11 @@ void clean(vector<Rover>* teamRover){
         teamRover->at(rover_number).network_for_agent.at(0).store_x_values.clear();
         teamRover->at(rover_number).network_for_agent.at(0).store_y_values.clear();
         teamRover->at(rover_number).network_for_agent.at(0).closest_dist_to_poi.clear();
+        teamRover->at(rover_number).network_for_agent.at(0).crowding_distance.clear();
+        teamRover->at(rover_number).network_for_agent.at(0).dominate.clear();
+        teamRover->at(rover_number).network_for_agent.at(0).dominating_over.clear();
+        teamRover->at(rover_number).network_for_agent.at(0).front.clear();
+        
     }
 }
 
@@ -1850,6 +1870,7 @@ int main(int argc, const char * argv[]) {
         
         //Generations
         for(int generation =0 ; generation < 100 ;generation++){
+            cout<<generation<<"Generation"<<endl;
             int case_number = 1;
             switch (case_number) {
                 case 1:
