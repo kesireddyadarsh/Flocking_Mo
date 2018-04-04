@@ -1886,7 +1886,6 @@ int main(int argc, const char * argv[]) {
             cal(p_rover,p_location_obstacle,distance_between_rovers,radius_of_obstacles,safe_distance);
             //EA_working(p_rover,number_of_rovers);
             nsgaii(p_rover, number_of_rovers);
-            clean(p_rover);
             
             if (generation == 0) {
                 bool print_t = true;
@@ -1937,6 +1936,9 @@ int main(int argc, const char * argv[]) {
                     fclose(p_f);
                 }
             }
+            
+            clean(p_rover);
+            
             
         }
         
